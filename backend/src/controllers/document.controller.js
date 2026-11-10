@@ -45,11 +45,15 @@ async function downloadDocument(req, res, next) {
     res.attachment(result.document.originalName);
     res.setHeader('Content-Type', result.document.contentType || 'application/octet-stream');
     return res.sendFile(result.filePath, (error) => {
-      if (error && !res.headersSent) {
-        res.status(404).json({
+      if (!error || res.headersSent) return;
+
+      if (error.code === 'ENOENT' || error.code === 'ENOTDIR') {
+        return res.status(404).json({
           error: { code: 'NOT_FOUND', message: 'Documento não encontrado.' },
         });
       }
+
+      return next(error);
     });
   } catch (error) {
     return next(error);

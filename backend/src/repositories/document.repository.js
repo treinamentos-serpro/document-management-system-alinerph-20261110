@@ -26,11 +26,23 @@ async function findOwnedFile(id, owner) {
     return null;
   }
 
-  const filePath = path.join(storageDirectory, document.storageName);
+  if (!/^[\da-f]{8}(-[\da-f]{4}){3}-[\da-f]{12}$/i.test(document.storageName)) {
+    return null;
+  }
+
+  const resolvedStorageDirectory = path.resolve(storageDirectory);
+  const filePath = path.resolve(resolvedStorageDirectory, document.storageName);
+  if (path.dirname(filePath) !== resolvedStorageDirectory) {
+    return null;
+  }
+
   try {
     await fs.access(filePath);
-  } catch {
-    return null;
+  } catch (error) {
+    if (error.code === 'ENOENT' || error.code === 'ENOTDIR') {
+      return null;
+    }
+    throw error;
   }
 
   return { document: toPublicDocument(document), filePath };

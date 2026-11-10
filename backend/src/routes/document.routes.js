@@ -12,7 +12,7 @@ const upload = multer({
     destination: storageDirectory,
     filename: (req, file, callback) => callback(null, crypto.randomUUID()),
   }),
-  limits: { fileSize: maxFileSizeBytes, files: 1 },
+  limits: { fileSize: maxFileSizeBytes, files: 1, fields: 0, parts: 2 },
 });
 
 const router = express.Router();

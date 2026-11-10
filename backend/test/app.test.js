@@ -96,6 +96,38 @@ test('faz upload, lista somente os documentos do proprietário e baixa o arquivo
   assert.equal(await download.text(), 'arquivo privado');
 });
 
+test('não usa segmentos do nome original como caminho físico', async () => {
+  const existingFiles = new Set(await fs.readdir(storageDirectory));
+  const form = new FormData();
+  form.append('file', new Blob(['conteudo']), '../../arquivo-fora.txt');
+  const response = await fetch(`${baseUrl}/upload`, {
+    method: 'POST',
+    headers: identityHeaders(`owner-${randomUUID()}`),
+    body: form,
+  });
+
+  assert.equal(response.status, 201);
+  const storedFiles = (await fs.readdir(storageDirectory))
+    .filter((file) => !existingFiles.has(file));
+  assert.equal(storedFiles.length, 1);
+  assert.match(storedFiles[0], /^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i);
+});
+
+test('rejeita campos multipart extras e remove o arquivo parcial', async () => {
+  const existingFiles = new Set(await fs.readdir(storageDirectory));
+  const form = new FormData();
+  form.append('file', new Blob(['conteudo']), 'relatorio.txt');
+  form.append('unexpected', 'valor');
+  const response = await fetch(`${baseUrl}/upload`, {
+    method: 'POST',
+    headers: identityHeaders(`owner-${randomUUID()}`),
+    body: form,
+  });
+
+  assert.equal(response.status, 400);
+  assert.deepEqual(await fs.readdir(storageDirectory), [...existingFiles]);
+});
+
 test('oculta documentos inexistentes e de outro proprietário com a mesma resposta 404', async () => {
   const existingFiles = new Set(await fs.readdir(storageDirectory));
   const owner = `owner-${randomUUID()}`;
