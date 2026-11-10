@@ -57,7 +57,7 @@ test('valida a identidade e rejeita identificadores maiores que 100 caracteres',
   assert.equal(longIdentity.status, 400);
 });
 
-test('faz upload, lista somente os documentos do proprietário e baixa o arquivo', async () => {
+test('POST /upload grava o arquivo e retorna metadados públicos', async () => {
   const existingFiles = new Set(await fs.readdir(storageDirectory));
   const owner = `owner-${randomUUID()}`;
   const response = await uploadFile(owner, 'relatorio.txt', 'arquivo privado');
@@ -78,15 +78,27 @@ test('faz upload, lista somente os documentos do proprietário e baixa o arquivo
   assert.equal(document.size, Buffer.byteLength('arquivo privado'));
   assert.equal(document.contentType, 'text/plain');
   assert.equal(Number.isNaN(Date.parse(document.uploadedAt)), false);
+});
+
+test('GET /documents lista somente os documentos do proprietário', async () => {
+  const owner = `owner-${randomUUID()}`;
+  const otherOwner = `other-${randomUUID()}`;
+  const ownUpload = await uploadFile(owner, 'proprio.txt', 'meu arquivo');
+  const otherUpload = await uploadFile(otherOwner, 'outro.txt', 'outro arquivo');
+  const { document: ownDocument } = await ownUpload.json();
+  const { document: otherDocument } = await otherUpload.json();
 
   const ownList = await fetch(`${baseUrl}/documents`, { headers: identityHeaders(owner) });
-  assert.deepEqual((await ownList.json()).documents, [document]);
+  assert.deepEqual((await ownList.json()).documents, [ownDocument]);
 
-  const otherList = await fetch(`${baseUrl}/documents`, {
-    headers: identityHeaders(`other-${randomUUID()}`),
-  });
-  assert.deepEqual((await otherList.json()).documents, []);
+  const otherList = await fetch(`${baseUrl}/documents`, { headers: identityHeaders(otherOwner) });
+  assert.deepEqual((await otherList.json()).documents, [otherDocument]);
+});
 
+test('GET /documents/:id/download entrega o arquivo do proprietário', async () => {
+  const owner = `owner-${randomUUID()}`;
+  const response = await uploadFile(owner, 'relatorio.txt', 'arquivo privado');
+  const { document } = await response.json();
   const download = await fetch(`${baseUrl}/documents/${document.id}/download`, {
     headers: identityHeaders(owner),
   });
