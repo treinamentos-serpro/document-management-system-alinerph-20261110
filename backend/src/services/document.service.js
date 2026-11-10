@@ -1,5 +1,5 @@
 const { randomUUID } = require('node:crypto');
-const documentRepository = require('../repositories/documentRepository');
+const documentRepository = require('../repositories/document.repository');
 
 async function createDocument(file, owner) {
   return documentRepository.save({

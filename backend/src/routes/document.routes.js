@@ -3,7 +3,7 @@ const fs = require('node:fs');
 const multer = require('multer');
 const express = require('express');
 const { maxFileSizeBytes, storageDirectory } = require('../storageConfig');
-const documentController = require('../controllers/documentController');
+const documentController = require('../controllers/document.controller');
 
 fs.mkdirSync(storageDirectory, { recursive: true });
 

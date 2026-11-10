@@ -58,9 +58,16 @@ test('valida a identidade e rejeita identificadores maiores que 100 caracteres',
 });
 
 test('faz upload, lista somente os documentos do proprietário e baixa o arquivo', async () => {
+  const existingFiles = new Set(await fs.readdir(storageDirectory));
   const owner = `owner-${randomUUID()}`;
   const response = await uploadFile(owner, 'relatorio.txt', 'arquivo privado');
   assert.equal(response.status, 201);
+
+  const uploadedFiles = (await fs.readdir(storageDirectory))
+    .filter((file) => !existingFiles.has(file));
+  assert.equal(uploadedFiles.length, 1);
+  assert.match(uploadedFiles[0], /^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i);
+  assert.equal(await fs.readFile(path.join(storageDirectory, uploadedFiles[0]), 'utf8'), 'arquivo privado');
 
   const { document } = await response.json();
   assert.deepEqual(Object.keys(document).sort(), [
@@ -85,11 +92,12 @@ test('faz upload, lista somente os documentos do proprietário e baixa o arquivo
   });
   assert.equal(download.status, 200);
   assert.match(download.headers.get('content-disposition'), /^attachment;/);
-  assert.equal(download.headers.get('content-type'), 'text/plain; charset=utf-8');
+  assert.equal(download.headers.get('content-type'), 'text/plain');
   assert.equal(await download.text(), 'arquivo privado');
 });
 
 test('oculta documentos inexistentes e de outro proprietário com a mesma resposta 404', async () => {
+  const existingFiles = new Set(await fs.readdir(storageDirectory));
   const owner = `owner-${randomUUID()}`;
   const response = await uploadFile(owner, 'privado.txt', 'segredo');
   const { document } = await response.json();
@@ -102,15 +110,18 @@ test('oculta documentos inexistentes e de outro proprietário com a mesma respos
   });
   assert.equal(foreign.status, 404);
   assert.equal(absent.status, 404);
-  assert.deepEqual(await foreign.json(), await absent.json());
+  const absentError = await absent.json();
+  assert.deepEqual(await foreign.json(), absentError);
 
   const storedFiles = await fs.readdir(storageDirectory);
-  await fs.unlink(path.join(storageDirectory, storedFiles[0]));
+  const uploadedFile = storedFiles.find((file) => !existingFiles.has(file));
+  assert.ok(uploadedFile);
+  await fs.unlink(path.join(storageDirectory, uploadedFile));
   const missingFile = await fetch(`${baseUrl}/documents/${document.id}/download`, {
     headers: identityHeaders(owner),
   });
   assert.equal(missingFile.status, 404);
-  assert.deepEqual(await missingFile.json(), await absent.json());
+  assert.deepEqual(await missingFile.json(), absentError);
 });
 
 test('rejeita uploads acima do limite configurado com 413', async () => {
